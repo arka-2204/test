@@ -2,15 +2,24 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Happy Rose Day! 🌹</title>
   <style>
-    body { margin: 0; overflow: hidden; height: 100vh; background: linear-gradient(to bottom, #ffe0e0, #ffb6c1); font-family: Arial, sans-serif; }
+    body { 
+      margin: 0; 
+      padding: 0;
+      overflow: hidden; 
+      height: 100vh; 
+      background: linear-gradient(to bottom, #ffe0e0, #ffb6c1); 
+      font-family: Arial, sans-serif; 
+      touch-action: none; /* Prevents mobile pulling/refreshing while interacting */
+    }
     h1 {
       position: absolute; top: 40px; left: 50%; transform: translateX(-50%);
       margin: 0; color: #d10024; font-size: 5rem; font-family: "Brush Script MT", cursive;
       text-shadow: 2px 2px 6px rgba(255,255,255,0.9);
       z-index: 10; pointer-events: none; white-space: nowrap;
+      text-align: center; width: 90%;
     }
     canvas { position: fixed; inset: 0; z-index: 1; }
     .petal {
@@ -28,6 +37,11 @@
       background: rgba(0,0,0,0.75); color: #fff; padding: 12px 14px;
       border-radius: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       z-index: 9999; display: none; white-space: pre-wrap;
+    }
+
+    /* Mobile Responsiveness */
+    @media (max-width: 600px) {
+      h1 { font-size: 2.5rem; top: 20px; }
     }
   </style>
 </head>
@@ -47,13 +61,9 @@
 
   <script type="module">
     const errBox = document.getElementById("err");
-    const showErr = (msg) => { 
-      errBox.style.display = "block"; 
-      errBox.textContent = msg; 
-      console.error(msg); 
-    };
+    const showErr = (msg) => { errBox.style.display = "block"; errBox.textContent = msg; };
 
-    // 1) Petals Animation
+    // 1) Falling Petals Logic
     function createPetal() {
       const petal = document.createElement("div");
       petal.className = "petal";
@@ -61,8 +71,7 @@
       const duration = Math.random() * 5 + 3;
       petal.style.animation = `fall ${duration}s linear infinite`;
       const size = Math.random() * 10 + 10;
-      petal.style.width = `${size}px`;
-      petal.style.height = `${size}px`;
+      petal.style.width = `${size}px`; petal.style.height = `${size}px`;
       const colors = ["#ff0040", "#ff4d4d", "#e60023", "#ff80a0", "#ff9999"];
       petal.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
       document.body.appendChild(petal);
@@ -70,54 +79,55 @@
     }
     setInterval(createPetal, 300);
 
-    // 2) Import Three.js modules
+    // 2) Three.js Core
     import * as THREE from 'three';
     import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
     import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 
-    // 3) Scene Setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 1.2, 3.2);
+    camera.position.set(0, 1.2, 3.5);
 
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     document.body.appendChild(renderer.domElement);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 1.2));
-    const dir = new THREE.DirectionalLight(0xffffff, 1.4);
+    scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+    const dir = new THREE.DirectionalLight(0xffffff, 2.0);
     dir.position.set(5, 10, 7);
     scene.add(dir);
 
-    // 4) Load Model
+    // 3) Load 3D Rose
     const loader = new GLTFLoader();
     const draco = new DRACOLoader();
     draco.setDecoderPath("https://www.gstatic.com/draco/v1/decoders/");
     loader.setDRACOLoader(draco);
 
     let rose = null;
-
-    loader.load(
-      "./rose.glb", 
-      (gltf) => {
+    loader.load("./rose.glb", (gltf) => {
         rose = gltf.scene;
-        rose.scale.set(3, 3, 3);
-        rose.position.set(0,0.5, 0);
+        // Responsive scaling
+        const s = window.innerWidth < 600 ? 3.5 : 5;
+        rose.scale.set(s, s, s);
+        rose.position.set(0, 0.5, 0); // Raised to the middle
         scene.add(rose);
-      },
-      undefined,
-      (e) => showErr("Failed to load ./rose.glb\n\nCheck if rose.glb is in the same folder and you are using a local server.")
+      }, undefined, (e) => showErr("File 'rose.glb' not found. Ensure it's in the same folder.")
     );
 
-    // 5) Interactivity & Animation
+    // 4) Unified Interaction (Mouse & Touch)
     const mouse = { x: 0, y: 0 };
     const smooth = { x: 0, y: 0 };
 
-    window.addEventListener("mousemove", (ev) => {
-      mouse.x = (ev.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(ev.clientY / window.innerHeight) * 2 + 1;
-    });
+    const handleMove = (clientX, clientY) => {
+      mouse.x = (clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+    };
+
+    window.addEventListener("mousemove", (e) => handleMove(e.clientX, e.clientY));
+    window.addEventListener("touchmove", (e) => {
+      if(e.touches.length > 0) handleMove(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: false });
 
     window.addEventListener("resize", () => {
       camera.aspect = window.innerWidth / window.innerHeight;
@@ -125,29 +135,21 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
+    // 5) Animation Loop
     function animate() {
-    requestAnimationFrame(animate);
+      requestAnimationFrame(animate);
+      smooth.x += (mouse.x - smooth.x) * 0.08;
+      smooth.y += (mouse.y - smooth.y) * 0.08;
 
-    // Smooth mouse movement for a high-quality feel
-    smooth.x += (mouse.x - smooth.x) * 0.08;
-    smooth.y += (mouse.y - smooth.y) * 0.08;
-
-    if (rose) {
-        // 1. POSITION: Stay in the center (0.5), sway slightly with mouse
+      if (rose) {
+        // No auto-spin, only interaction
         rose.position.x = smooth.x * 0.4;
         rose.position.y = 0.5 + (smooth.y * 0.2); 
-
-        // 2. ROTATION: Interact only. No automatic spinning.
-        // X handles the vertical tilt (up/down)
-        // Y handles the horizontal turn (left/right)
-        rose.rotation.x = -smooth.y * 0.4; 
         rose.rotation.y = smooth.x * 0.8; 
-        
-        // 3. LOCK Z: Keeps the stem from rolling sideways
-        rose.rotation.z = 0; 
-    }
-
-    renderer.render(scene, camera);
+        rose.rotation.x = -smooth.y * 0.3;
+        rose.rotation.z = 0; // Locked vertical axis
+      }
+      renderer.render(scene, camera);
     }
     animate();
   </script>
